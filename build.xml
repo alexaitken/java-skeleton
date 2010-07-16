@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Auction Sniper" default="build">
+	<property file="build.properties" />
+	
+	    
+    
+	<path id="cobertura.classpath">
+		<fileset dir="${cobertura.dir}">
+			<include name="cobertura.jar" />
+			<include name="dependancies/*.jar" />
+		</fileset>
+	</path>
+
+	<taskdef classpathref="cobertura.classpath" resource="tasks.properties"/>
+
+
+    <path id="test.lib.path">
+        <fileset dir="${lib.dir}/develop" includes="*.jar" excludes="*-src.jar"/>
+    </path>
+
+	<target name="init">
+    	<mkdir dir="${build.dir}"/>
+    	<mkdir dir="${app.classes.dir}" />
+		<mkdir dir="${test.classes.dir}" />
+		<mkdir dir="${instrumented.classes.dir}" />
+		<mkdir dir="${reports.dir}"/>
+		<mkdir dir="${reports.xml.dir}"/>
+		<mkdir dir="${reports.html.dir}"/>
+		<mkdir dir="${coverage.xml.dir}"/>
+		<mkdir dir="${coverage.summaryxml.dir}"/>
+		<mkdir dir="${coverage.html.dir}"/>
+    </target>
+
+    <target name="clean">
+    	<delete dir="${build.dir}" quiet="true" />
+		<delete dir="${reports.dir}" quiet="true" />
+		<delete file="cobertura.log" />
+		<delete file="cobertura.ser" />
+    </target>
+    
+    <target name="app.compile" depends="init">
+        <property name="app.src.dir" location="${src.dir}" />
+    	
+        <javac destdir="${app.classes.dir}"
+               srcdir="${app.src.dir}"
+        	   debug="on"/>
+    </target>
+
+    <target name="test.unit.compile"
+        	depends="init">
+        <property name="test.src.dir" location="${test.dir}/unit" />
+    	
+        <javac destdir="${test.classes.dir}" srcdir="${test.src.dir}" debug="on">
+               <classpath>
+	               <path refid="test.lib.path"/>
+	               <path location="${app.classes.dir}" />
+               </classpath>
+		</javac>
+    </target>
+    
+    <target name="test.unit.run"
+    		description="Run the tests" 
+    		depends="init, test.unit.compile" >
+        
+        <junit fork="true">
+			<sysproperty key="net.sourceforge.cobertura.datafile" file="cobertura.ser" />
+       		<classpath>
+                <path location="${test.classes.dir}" />
+                <path refid="test.lib.path" />
+                
+                <!-- order of these next two class path entries is important to allow intrumentation to work -->
+                <path location="${instrumented.classes.dir}" />
+                <path location="${app.classes.dir}" />
+                
+                
+                <path refid="cobertura.classpath" />
+                
+            </classpath>
+        	<formatter type="xml"/>
+            <batchtest todir="${reports.xml.dir}" failureProperty="test.failed"	>
+                <fileset dir="${test.dir}/unit" includes="**/*Test.java" />
+            </batchtest>
+            
+        </junit>
+        
+        <junitreport todir="${reports.xml.dir}">
+			<fileset dir="${reports.xml.dir}">
+				<include name="TEST-*.xml" />
+			</fileset>
+			<report format="frames" todir="${reports.html.dir}" />
+		</junitreport>
+    </target>
+    
+    
+    
+    <target name="instrument" depends="init, app.compile">
+		<cobertura-instrument todir="${instrumented.classes.dir}">
+			<fileset dir="${app.classes.dir}">
+				<include name="**/*.class" />
+			</fileset>
+		</cobertura-instrument>
+	</target>
+
+    
+    
+    <target name="coverage-check">
+		<cobertura-check branchrate="34" totallinerate="100" />
+	</target>
+
+	<target name="coverage-report">
+		<!--
+			Generate an XML file containing the coverage data using
+			the "srcdir" attribute.
+		-->
+		<cobertura-report srcdir="${src.dir}" destdir="${coverage.xml.dir}" format="xml" />
+	</target>
+
+	<target name="summary-coverage-report">
+		<!--
+			Generate an summary XML file containing the coverage data using
+			the "srcdir" attribute.
+		-->
+		<cobertura-report srcdir="${src.dir}" destdir="${coverage.summaryxml.dir}" format="summaryXml" />
+	</target>
+
+	<target name="alternate-coverage-report">
+		<!--
+			Generate a series of HTML files containing the coverage
+			data in a user-readable form using nested source filesets.
+		-->
+		<cobertura-report destdir="${coverage.html.dir}">
+			<fileset dir="${src.dir}">
+				<include name="**/*.java"/>
+			</fileset>
+		</cobertura-report>
+	</target>
+    
+    
+    <target name="build"
+    	description="Clean, build, and full test" 
+   		depends="clean, test.unit.run" />
+   		
+	<target name="coverage" depends="clean, instrument, test.unit.run, 
+									coverage-report, summary-coverage-report,alternate-coverage-report" 
+		description="Compile, instrument ourself, run the tests and generate JUnit and coverage reports."/>
+   		
+</project>
